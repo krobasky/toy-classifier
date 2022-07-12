@@ -159,15 +159,14 @@ file = 'data/gtex/superclass-count.tsv'
 print(f"+Write tissue type counts {file}")
 tissuetype_count_df.to_csv(file, sep='\t', index=False)
 
-print(f"+tissue type counts: {tissuetype_count_df}")
+print(f"+ tissue type counts: {tissuetype_count_df}")
 
-
-'''
-#for i in `awk -F'\t' '{print $2}' sample_id-superclass_name.tsv|sort -u` ; do mkdir data/gtex-superclass/${i}; done
-pushd data/gtex-all
-for i in `ls -1 |sed 's/.npy.gz//'` ; do j=`grep -w $i ../../sample_id-superclass_name.tsv|awk '{print $2}'`; cp ${i}.npy.gz ../gtex-superclass/$j ; done 
-popd
-'''
+print("""+ Reload each observation like such:
+import gzip
+import numpy as np
+with gzip.GzipFile('data/gtex/<cls>/<sample_id>.npy.gz') as f:
+    obs=np.load(f)
+""")
 
 
 ###### Stratify Balanced Training and Testing Sets in GTEx Gene Expression
