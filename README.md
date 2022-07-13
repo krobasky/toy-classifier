@@ -12,6 +12,7 @@
   - [Start notebook server](#start-notebook-server)
 - [Install data and other supporting apps](#install-data-and-other-supporting-apps)
   - [CIFAR-10](#cifar-10)
+  - [GTEX](#gtex)
 - [Future](#future)
 
 ## Running apps
@@ -179,6 +180,7 @@ Install data to `./src/data` to run with the provided apps
 
 Nothing extra needs to be done to retrieve these data; The model loads them directly during runtime with: `cifar10.load_data()`
 
+## GTeX
 
 # Future
 Following are future features:
