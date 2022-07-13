@@ -3,6 +3,14 @@ import random
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
+#TYPE=""
+#TYPE="median"
+#TYPE="mean"
+TYPE="max"
+
+ext=f".{TYPE}"
+
+
 print("+ This will take about 10 minutes with a power laptop, but requires a lot of memory for doing a groupby median on the gene expression")
 print("+ Results in annotated geneset that is compatible with other datasets, like TCGA and TARGET")
 print("""+ First run: 
@@ -47,7 +55,7 @@ attr_df = pd.read_table(attr_path)
 # This involves updating Entrez gene ids, sorting and subsetting
 
 print("+ Read gene expression - this takes a little while")
-os.makedirs("data/gtex",exist_ok=True)
+os.makedirs(f"data/gtex{ext}",exist_ok=True)
 expr_path = 'data/dist/gtex/GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_tpm.gct.gz'
 expr_df = pd.read_table(expr_path, sep='\t', skiprows=2, index_col=1)
 print("+ Get GTEx gene mapping")
@@ -61,13 +69,14 @@ print("+ Perform inner merge gene df to get ensembl to entrez mapping")
 gene_df=get_gene_df()
 map_df = expr_gene_ids.merge(gene_df, how='inner', left_on='Description', right_on='symbol')
 print("+ Save map, expression dataframes")
-map_df.reset_index().to_feather("data/gtex/map.ftr") # if you run out of memory, this will load fast
+map_df.reset_index().to_feather(f"data/gtex{ext}/map.ftr") # if you run out of memory, this will load fast
 ## execute if needed -
 # map_df = pd.read_feather("map.ftr")
 # map_df = map_df.set_index('index')
 
 # save expr so far
-expr_df.reset_index().to_feather("data/gtex/expr.ftr")
+expr_df.reset_index().to_feather(f"data/gtex{ext}/expr.ftr")
+
 ## execute if needed -
 #expr_df = pd.read_feather("expr.ftr")
 #expr_df = expr_df.set_index('Description')
@@ -77,7 +86,12 @@ expr_df=expr_df.drop(['Name'], axis='columns')
 print("+ *Drop any rows with 'na's...")
 expr_df=expr_df.dropna(axis='rows')
 print("+ *groupby mean...") # xxx is this correct? Should we use median, or preprocessed file?
-expr_df=expr_df.groupby(level=0).mean()
+if TYPE == "median":
+    expr_df=expr_df.groupby(level=0).median()
+if TYPE == "mean":
+    expr_df=expr_df.groupby(level=0).mean()
+if TYPE == "max":
+    expr_df=expr_df.groupby(level=0).max()
 print("+ *reindex map...")
 expr_df=expr_df.reindex(map_df.symbol)
 symbol_to_entrez = dict(zip(map_df.symbol, map_df.entrez_gene_id))
@@ -94,7 +108,7 @@ print("+ *sort bye columns...")
 expr_df = expr_df.sort_index(axis='columns')
 print("+ write expr again")
 expr_df.columns = expr_df.columns.astype(str)
-expr_df.reset_index().to_feather("data/gtex/expr.ftr")
+expr_df.reset_index().to_feather(f"data/gtex{ext}/expr.ftr")
 
 '''
 expr_df = (expr_df
@@ -112,9 +126,9 @@ expr_df = (expr_df
 print("+ rename index")
 expr_df.index.rename('sample_id', inplace=True)
 print("+ write expr one more time")
-expr_df.reset_index().to_feather("data/gtex/expr.ftr")
+expr_df.reset_index().to_feather(f"data/gtex{ext}/expr.ftr")
 
-file="data/gtex/gene_ids.txt"
+file=f"data/gtex{ext}/gene_ids.txt"
 print(f"+ Write out gene ids in order ({file})")
 with open(file,"a") as f:
     for col in expr_df.columns:
@@ -131,21 +145,21 @@ attr_df["SMTS"] = attr_df["SMTS"].str.replace(' ','_')
 class_names=set(attr_df["SMTS"])
 print(f"++ Class names set: {class_names}")
 
-attr_df[["SAMPID","SMTS"]].to_csv("data/gtex/sample_id-superclass_name.tsv", sep="\t", index=False, header=False)
+attr_df[["SAMPID","SMTS"]].to_csv(f"data/gtex{ext}/sample_id-superclass_name.tsv", sep="\t", index=False, header=False)
 
 print("+ Create dir structure for classes")
-os.makedirs('data/gtex', exist_ok=True)
+os.makedirs(f'data/gtex{ext}', exist_ok=True)
 for cls in class_names:
-  os.makedirs(f"data/gtex/{cls}",exist_ok=True)
+  os.makedirs(f"data/gtex{ext}/{cls}",exist_ok=True)
 
-print("+ Create a numpy for each row, write to data/gtex, separate out later")
+print(f"+ Create a numpy for each row, write to data/gtex{ext}, separate out later")
 import gzip
 import numpy as np
 for idx, nparray in enumerate(np.array(expr_df.iloc[:])):
     nparray=nparray.astype(np.float16)
     sample_id=expr_df.index[idx]
     cls=attr_df.loc[attr_df["SAMPID"]==sample_id, "SMTS"].iloc[0]
-    with gzip.GzipFile(f"data/gtex/{cls}/{sample_id}.npy.gz", "w") as f:
+    with gzip.GzipFile(f"data/gtex{ext}/{cls}/{sample_id}.npy.gz", "w") as f:
         np.save(file=f, arr=nparray)
 
 strat = attr_df.set_index('SAMPID').reindex(expr_df.index).SMTSD
@@ -155,7 +169,7 @@ tissuetype_count_df = (
     .rename({'index': 'tissuetype', 'SMTSD': 'n ='}, axis='columns')
 )
 
-file = 'data/gtex/superclass-count.tsv'
+file = f'data/gtex{ext}/superclass-count.tsv'
 print(f"+Write tissue type counts {file}")
 tissuetype_count_df.to_csv(file, sep='\t', index=False)
 
@@ -164,7 +178,7 @@ print(f"+ tissue type counts: {tissuetype_count_df}")
 print("""+ Reload each observation like such:
 import gzip
 import numpy as np
-with gzip.GzipFile('data/gtex/<cls>/<sample_id>.npy.gz') as f:
+with gzip.GzipFile(f'data/gtex{ext}/<cls>/<sample_id>.npy.gz') as f:
     obs=np.load(f)
 """)
 
