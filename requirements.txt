@@ -24,3 +24,4 @@ testpath
 typeguard
 scikit-learn
 feather-format
+kaleido
